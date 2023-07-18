@@ -3,7 +3,9 @@
 # Author: Wenjin Li
 # Date: 2023/07/03
 
+import os
 import sys
+import subprocess
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QLineEdit, QTextEdit, QPushButton, QComboBox
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
 import requests
@@ -14,8 +16,7 @@ import web_crawler
 class MainWindow(QWidget):
     crawler = web_crawler.Crawler()
     log_in_status = False
-    class_dict = {}
-
+   
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Piazza File Downloader")
@@ -27,23 +28,26 @@ class MainWindow(QWidget):
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.Password)
         self.log_in_button = QPushButton("Log in")
-        
-        
-        # # use a thread to run the log_in function if the log_in button is clicked
-        # self.log_in_thread = threading.Thread(target=self.log_in)
-        # self.log_in_button.clicked.connect(self.log_in_thread.start)
         self.log_in_button.clicked.connect(self.log_in)
         
         self.start_download_button = QPushButton("Start Download")
         self.start_download_button.clicked.connect(self.start_download)
-        # self.start_download_button.setEnabled(False)  # Disable the button initially
+        self.start_download_button.setEnabled(False)  # Disable the button initially
         
-        # create a drop down menu
-        self.drop_down_menu = QComboBox()
+        # create drop down menu
+        self.drop_down_menu_for_class = QComboBox()
+        self.drop_down_menu_for_resource = QComboBox()
+        # Disable the drop-down menu initially
+        self.drop_down_menu_for_class.setEnabled(False)
+        self.drop_down_menu_for_resource.setEnabled(False)
 
         # Create status console
         self.status_console = QTextEdit()
         self.status_console.setReadOnly(True)
+
+        # Create open folder button
+        self.open_folder_button = QPushButton("Open Folder")
+        self.open_folder_button.clicked.connect(self.open_folder)
         
         # Create layout and add widgets
         layout1 = QHBoxLayout()
@@ -52,31 +56,44 @@ class MainWindow(QWidget):
         layout1.addWidget(QLabel("Password:"))
         layout1.addWidget(self.password_input)
         layout1.addWidget(self.log_in_button)
+        layout1.addWidget(self.drop_down_menu_for_class)
+        layout1.addWidget(self.drop_down_menu_for_resource)
         layout1.addWidget(self.start_download_button)
-        layout1.addWidget(self.drop_down_menu)
+        layout1.addWidget(self.open_folder_button)
+        layout1.addWidget(self.status_console)
         
         # Set layout spacing and alignment
         layout1.setSpacing(10)  # Set spacing between widgets
         layout1.setAlignment(Qt.AlignTop)  # Align widgets to the top of the window
-        layout1.addWidget(self.status_console)
         self.setLayout(layout1)
+        
+        # Connect the class selection change event
+        self.drop_down_menu_for_class.currentIndexChanged.connect(self.update_resource_drop_down_menu)
 
-        # Create the login thread
-        self.login_thread = threading.Thread(target=self.log_in_worker)
+    def open_folder(self):
+        folder_path = os.getcwd()
+        subprocess.Popen(['explorer', folder_path])
+
 
     def log_in(self):
-        if not self.login_thread.is_alive():
-            # Save the email and password to the crawler
-            self.crawler.email = self.email_input.text()
-            self.crawler.password = self.password_input.text()
+        # Disable the log-in button
+        self.log_in_button.setEnabled(False)
+        
+        # Create a new thread for the login process
+        self.login_thread = threading.Thread(target=self.log_in_worker)
             
-            # Disable the log-in button
-            self.log_in_button.setEnabled(False)
-            
-            # Start the login thread
-            self.login_thread.start()
+        # Start the login thread
+        self.login_thread.start()
 
     def log_in_worker(self):
+        # Save the email and password to the crawler
+        self.crawler.email = self.email_input.text()
+        self.crawler.password = self.password_input.text()
+        
+        # print "Logging in..."
+        self.status_console.append("Logging in...")
+
+        # Perform the login process
         self.log_in_status = self.crawler.log_in()
         
         # Update the GUI from the main thread
@@ -84,44 +101,88 @@ class MainWindow(QWidget):
 
     @pyqtSlot()
     def handle_login_result(self):
-        # save the email and password to the crawler
-        # self.crawler.email = self.email_input.text()
-        # self.crawler.password = self.password_input.text()
-        # self.log_in_status = self.crawler.log_in()
         if self.log_in_status == False:
             # if log in failed, print "Log in failed" in status_console
             self.status_console.append("Log in failed")
+            # turn on the log in button
+            self.log_in_button.setEnabled(True)
             # clear the email and password input
             # self.email_input.clear()
-            # self.password_input.clear()
+            self.password_input.clear()
         else:
             # if log in successfully, print "Log in successfully" in status_console
             self.status_console.append("Log in successfully")
-           
+
+            # Clear the email and password input
             self.email_input.clear()
             self.password_input.clear()
             
             # after log in successfully, get the class_dict
-            self.class_dict = self.crawler.class_dropDown_menu()
+            self.crawler.get_class_dropDown_menu()
 
             # print the class_dict in the drop down menu
-            self.drop_down_menu.addItem("Select a class")
-            for i in range(len(self.class_dict)):
-                self.drop_down_menu.addItem(self.class_dict[i]['class_name'])
+            self.drop_down_menu_for_class.addItem("Select a class")
+            self.drop_down_menu_for_resource.addItem("Select a resource")
+
+            for i in range(len(self.crawler.class_dict)):
+                self.drop_down_menu_for_class.addItem(self.crawler.class_dict[i]['class_name'])
             
-            # Enable the start download button
+            # Enable the drop-down menu and start download button
+            self.drop_down_menu_for_class.setEnabled(True)
             self.start_download_button.setEnabled(True)
 
-    def start_download(self):
-        # from the drop down menu, if user selected the class that they want to download, then start download that class and load that class's url
-        if self.drop_down_menu.currentText() != "Select a class":
-            self.crawler.download_files(self.class_dict[self.drop_down_menu.currentIndex()-1]['url'])
-        else:
-            self.status_console.append("Please select a class")
+            # Update the resource drop-down menu
+            self.update_resource_drop_down_menu()
+    
+    @pyqtSlot()
+    def update_resource_drop_down_menu(self):
+        # Clear the session dictionary and disable the resource drop-down menu
+        self.crawler.session_dict = {}
+        self.drop_down_menu_for_resource.clear()
+        self.drop_down_menu_for_resource.setEnabled(False)
+
+        # Get the index of the selected class
+        class_index = self.drop_down_menu_for_class.currentIndex() - 1
+
+        if class_index >= 0:
+            # Update the session information based on the selected class
+            self.crawler.get_resource_dropDown_menu(class_index=class_index)
+
+            # Update the resource drop-down menu
+            self.drop_down_menu_for_resource.addItem("Select a resource")
+            for i in range(len(self.crawler.session_dict)):
+                self.drop_down_menu_for_resource.addItem(self.crawler.session_dict[i]['session_name'])
+
+            self.drop_down_menu_for_resource.setEnabled(True)
         
+    def start_download(self):
+        # Disable the start download button
+        self.start_download_button.setEnabled(False)
+        # TODO: Create a new thread for the download process, add a progress bar, and make it in a new thread later
+        # print "Start Downloading..."
+        self.status_console.append("Start Downloading...")
+        self.start_download_worker()
+        # Enable the start download button
+        self.start_download_button.setEnabled(True)
+
+    @pyqtSlot()
+    def start_download_worker(self):
+        # from those selected class and resource, start the download process
+        if self.drop_down_menu_for_class.currentText() != "Select a class" \
+            and self.drop_down_menu_for_resource.currentText() != "Select a resource":
+            number_of_file = self.crawler.download_files(self.drop_down_menu_for_class.currentIndex()-1, self.drop_down_menu_for_resource.currentIndex()-1)
+            if number_of_file == 0:
+                self.status_console.append("No file to download")
+            elif number_of_file == 1:
+                self.status_console.append(f"Download finished {number_of_file} file")
+            else:
+                self.status_console.append(f"Download finished {number_of_file} files")
+        else:
+            self.status_console.append("Please select a class and a resource")
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
-    window.crawler.driver.quit()
+    # window.crawler.driver.quit()

@@ -6,6 +6,7 @@
 import requests
 import os
 import time
+import mimetypes
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
@@ -19,6 +20,8 @@ class Crawler():
     password = ''
     driver = None
     session = None
+    class_dict = {} # save all the classes in a dictionary
+    session_dict = {} # save all the sessions in a dictionary
 
     def __init__(self):
         # Configure Chrome options for running in headless mode
@@ -67,39 +70,74 @@ class Crawler():
             self.driver.quit()
             exit(0)
 
-    def class_dropDown_menu(self):
+    def get_class_dropDown_menu(self):
         self.driver.find_element("id", 'classDropdownMenuId').click()
         time.sleep(1)
         self.driver.find_element("id", 'toggleInactiveNetworksId').click()
         time.sleep(1)
         my_classes = self.driver.find_element("id", 'my_classes')
         
-        # save all the classes in a dictionary
-        class_dict = {}
+        
         class_elements = my_classes.find_elements(By.CSS_SELECTOR, "a[data-pats='classes_dropdown_item']")
 
         for i, class_element in enumerate(class_elements):
-            # print(class_element.text,end="| ")
+            # print(class_element.text,end=" | ")
             # print(class_element.get_attribute("id"))
             # print(class_element.find_element(By.CLASS_NAME, "course_number").text)
             class_name = class_element.find_element(By.CLASS_NAME, "course_number").text
             class_url = class_element.get_attribute("id").replace('network_', 'https://piazza.com/class/')
-            class_dict[i] = {
+            self.class_dict[i] = {
                 'rank_id': i,
                 "class_name": class_name,
                 "url": class_url
             }
 
-        # print(class_dict)
-        return class_dict
+        # print(self.class_dict)
+        # return self.class_dict
     
-    def download_files(self, target_url):
-        # load the target url
-        self.driver.get(target_url)
+    def get_resource_dropDown_menu(self, class_index):
+        # only for testing
+        # self.driver.get('https://piazza.com/university_of_california_santa_barbara/spring2023/cmpsc171/resources')
+        # self.driver.find_element("id", 'resources_link').click()
+        # end with testing code
+
+        # go to the target url and click the resource link
+        self.driver.get(self.class_dict[class_index]['url'])
         self.driver.find_element("id", 'resources_link').click()
-        
+
         # wait for the page to load
-        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.ID, 'resourceLink_idx0_0')))
+        time.sleep(1)
+        # find the resources element and save all the sessions in a dictionary
+        resources_element = self.driver.find_element(By.ID, "resources")
+        i = 0
+        while True:
+            try:
+                session_element = resources_element.find_element(By.ID, f"section_name_idx{i}").text
+                # print(session_element) # print the session name # for testing
+                self.session_dict[i] = {
+                    'rank_id': i,
+                    "session_name": session_element,
+                }
+                i += 1
+            except NoSuchElementException:
+                break
+        # print('====================session_dict====================')
+        # print(self.session_dict)
+        # return session_dict
+        
+
+
+    def download_files(self, class_index, session_index):
+        # find the class name
+        class_name = self.class_dict[class_index]['class_name']
+
+        # find the session name
+        session_name = self.session_dict[session_index]['session_name']
+
+        # create a folder for the class
+        folder_path = f'./{class_name}/{session_name}'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
         
         # get the cookies from the browser
         cookies = self.driver.get_cookies()
@@ -109,43 +147,58 @@ class Crawler():
         for cookie in cookies:
             self.session.cookies.set(cookie['name'], cookie['value'])
         
-        # download the all the files
-        # TODO: download the selected area file
-        i = 0
+        number_of_file = 0
         while True:
             try:
-                element = self.driver.find_element("id", f'resourceLink_idx0_{i}')
-                # element = driver.find_element("id", f'resourceLink_idx1_{i}')
-                # element = driver.find_element("id", f'resourceLink_idx2_{i}')
+                element = self.driver.find_element("id", f'resourceLink_idx{session_index}_{number_of_file}')
                 file_url = element.get_attribute('href')
                 print(f"loading URL: {file_url}")
 
                 file_name = element.text.strip()
-                
+                print(f"file name: {file_name}")
                 # check if the file still exists, if not, skip to the next file
                 response = self.session.get(file_url)
                 response_code = response.raise_for_status()
                 if response_code != None:
                     print(f"Error code: {response_code}")
-                    i += 1
+                    number_of_file += 1
                     continue
+                
+                # Determine the file extension # TODO: if it's a google doc, show the warning and prompt the user to download it manually
+                file_extension = mimetypes.guess_extension(response.headers.get('Content-Type'))
+                print(f"file extension: {file_extension}")
+                if not file_extension:
+                    # If the file extension is missing, assume it is a PDF
+                    file_extension = '.pdf'
+
+                # Remove the file extension from the file name if it already exists
+                if file_name.endswith(file_extension):
+                    file_name = file_name[:-(len(file_extension))]
+
+                # Construct the file path with the determined extension
+                file_path = os.path.join(folder_path, f'{file_name}{file_extension}')
 
                 # download the file and save it to the local folder "test_files", this file could be a pdf, ppt, docx, zip, etc.
-                with open(f'./test_files/{file_name}', 'wb') as file:
+                # with open(f'./test_files/{file_name}', 'wb') as file:
+                with open(file_path, 'wb') as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
 
                 print(f'Downloaded: {file_name}')
-                i += 1
+                number_of_file += 1
                 
             except Exception:
                 print("no more file!")
                 break
+        
+        return number_of_file
 
 if __name__ == "__main__":
-    testing_crawler = Crawler()
-    testing_crawler.email = 'enter your email here'
-    testing_crawler.password = 'enter your password here'
-    testing_crawler.log_in()
-    testing_crawler.class_dropDown_menu()
+    pass
+    # testing_crawler = Crawler()
+    # testing_crawler.email = 'enter your email here'
+    # testing_crawler.password = 'enter your password here'
+    # testing_crawler.log_in()
+    # testing_crawler.get_class_dropDown_menu()
+    # testing_crawler.get_resource_dropDown_menu()
     # testing_crawler.download_files()
