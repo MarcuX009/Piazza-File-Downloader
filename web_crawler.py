@@ -92,15 +92,8 @@ class Crawler():
                 "url": class_url
             }
 
-        # print(self.class_dict)
-        # return self.class_dict
     
     def get_resource_dropDown_menu(self, class_index):
-        # only for testing
-        # self.driver.get('https://piazza.com/university_of_california_santa_barbara/spring2023/cmpsc171/resources')
-        # self.driver.find_element("id", 'resources_link').click()
-        # end with testing code
-
         # go to the target url and click the resource link
         self.driver.get(self.class_dict[class_index]['url'])
         self.driver.find_element("id", 'resources_link').click()
@@ -121,11 +114,6 @@ class Crawler():
                 i += 1
             except NoSuchElementException:
                 break
-        # print('====================session_dict====================')
-        # print(self.session_dict)
-        # return session_dict
-        
-
 
     def download_files(self, class_index, session_index):
         # find the class name
