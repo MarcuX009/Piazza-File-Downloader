@@ -29,8 +29,8 @@ class Crawler():
         chrome_options.add_argument("--headless=new")  # Run in headless mode
 
         # Create the webdriver with the specified options
-        # self.driver = webdriver.Chrome(options=chrome_options)
-        self.driver = webdriver.Chrome()
+        self.driver = webdriver.Chrome(options=chrome_options)
+        # self.driver = webdriver.Chrome()
         # open the login page
         url = 'https://piazza.com/account/login'
         self.driver.get(url)
