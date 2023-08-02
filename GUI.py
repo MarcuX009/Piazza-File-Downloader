@@ -5,11 +5,10 @@
 
 import os
 import sys
-import subprocess
+from subprocess import Popen
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QLineEdit, QTextEdit, QPushButton, QComboBox
 from PyQt5.QtCore import Qt, QMetaObject, pyqtSlot
-import requests
-import threading
+from threading import Thread
 
 import web_crawler
 
@@ -56,23 +55,38 @@ class MainWindow(QWidget):
         layout1.addWidget(QLabel("Password:"))
         layout1.addWidget(self.password_input)
         layout1.addWidget(self.log_in_button)
-        layout1.addWidget(self.drop_down_menu_for_class)
-        layout1.addWidget(self.drop_down_menu_for_resource)
-        layout1.addWidget(self.start_download_button)
-        layout1.addWidget(self.open_folder_button)
-        layout1.addWidget(self.status_console)
-        
-        # Set layout spacing and alignment
-        layout1.setSpacing(10)  # Set spacing between widgets
+
+        layout1.setSpacing(10)  
         layout1.setAlignment(Qt.AlignTop)  # Align widgets to the top of the window
-        self.setLayout(layout1)
+
+        layout2 = QHBoxLayout()
+        layout2.addWidget(self.drop_down_menu_for_class)
+        layout2.addWidget(self.drop_down_menu_for_resource)
+        layout2.addWidget(self.start_download_button)
+        layout2.addWidget(self.open_folder_button)
+
+        layout3 = QHBoxLayout()
+        layout3.addWidget(self.status_console)
         
+        # Set the main layout for the widget
+        main_layout = QVBoxLayout()  # Main vertical layout for the entire window
+        
+        # Add layouts to the main layout vertically
+        main_layout.addLayout(layout1)
+        main_layout.addLayout(layout2)
+        main_layout.addLayout(layout3)
+        
+        main_layout.setSpacing(10)
+        main_layout.setAlignment(Qt.AlignTop)
+
+        self.setLayout(main_layout)
+    
         # Connect the class selection change event
         self.drop_down_menu_for_class.currentIndexChanged.connect(self.update_resource_drop_down_menu)
 
     def open_folder(self):
         folder_path = os.getcwd()
-        subprocess.Popen(['explorer', folder_path])
+        Popen(['explorer', folder_path])
 
 
     def log_in(self):
@@ -80,7 +94,7 @@ class MainWindow(QWidget):
         self.log_in_button.setEnabled(False)
         
         # Create a new thread for the login process
-        self.login_thread = threading.Thread(target=self.log_in_worker)
+        self.login_thread = Thread(target=self.log_in_worker)
             
         # Start the login thread
         self.login_thread.start()
@@ -103,7 +117,7 @@ class MainWindow(QWidget):
     def handle_login_result(self):
         if self.log_in_status == False:
             # if log in failed, print "Log in failed" in status_console
-            self.status_console.append("Log in failed")
+            self.status_console.append("Log in failed, please manually log in to see if there is any error message")
             # turn on the log in button
             self.log_in_button.setEnabled(True)
             # clear the email and password input
@@ -160,26 +174,26 @@ class MainWindow(QWidget):
         self.start_download_button.setEnabled(False)
         # TODO: Create a new thread for the download process, add a progress bar, and make it in a new thread later
         # print "Start Downloading..."
-        self.status_console.append("Start Downloading...")
-        self.start_download_worker()
+        if self.drop_down_menu_for_class.currentText() != "Select a class" \
+            and self.drop_down_menu_for_resource.currentText() != "Select a resource":
+            self.status_console.append("Start Downloading...")
+            self.start_download_worker()
+        else:
+            self.status_console.append("Please select a class and a resource")
         # Enable the start download button
         self.start_download_button.setEnabled(True)
 
     @pyqtSlot()
     def start_download_worker(self):
         # from those selected class and resource, start the download process
-        if self.drop_down_menu_for_class.currentText() != "Select a class" \
-            and self.drop_down_menu_for_resource.currentText() != "Select a resource":
-            number_of_file = self.crawler.download_files(self.drop_down_menu_for_class.currentIndex()-1, self.drop_down_menu_for_resource.currentIndex()-1)
-            if number_of_file == 0:
-                self.status_console.append("No file to download")
-            elif number_of_file == 1:
-                self.status_console.append(f"Download finished {number_of_file} file")
-            else:
-                self.status_console.append(f"Download finished {number_of_file} files")
+        number_of_file = self.crawler.download_files(self.drop_down_menu_for_class.currentIndex()-1, self.drop_down_menu_for_resource.currentIndex()-1)
+        if number_of_file == 0:
+            self.status_console.append("No file to download")
+        elif number_of_file == 1:
+            self.status_console.append(f"Download finished {number_of_file} file")
         else:
-            self.status_console.append("Please select a class and a resource")
-
+            self.status_console.append(f"Download finished {number_of_file} files")
+        
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
