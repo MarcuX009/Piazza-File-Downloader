@@ -2,6 +2,8 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.x-blue.svg)
 
+![image](https://github.com/MarcuX009/Piazza-File-Downloader/assets/63788013/8560706d-823a-48a8-b759-994c84be7a5c)
+
 The Piazza File Downloader is a Python tool with a simple user interface application that allows you to download files from your Piazza class sessions effortlessly. It utilizes web scraping to interact with the Piazza platform and retrieve files, making it a convenient solution for organizing and accessing your course materials.
 
 ## Features
