@@ -5,7 +5,7 @@
 
 import requests
 import os
-import time
+from time import sleep
 import mimetypes
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -45,7 +45,7 @@ class Crawler():
             email_field.send_keys(self.email)
             password_field.send_keys(self.password)
             password_field.send_keys(Keys.RETURN)
-            time.sleep(1)
+            sleep(1)
 
             try:
                 # Check if login was successful and print error message if not
@@ -68,13 +68,13 @@ class Crawler():
         except TimeoutException:
             print("Login process took too long. Please check your internet connection or try again later.")
             self.driver.quit()
-            exit(0)
+            return False # sometime piazza will ask for verification your student status, so you need to manually log in
 
     def get_class_dropDown_menu(self):
         self.driver.find_element("id", 'classDropdownMenuId').click()
-        time.sleep(1)
+        sleep(1)
         self.driver.find_element("id", 'toggleInactiveNetworksId').click()
-        time.sleep(1)
+        sleep(1)
         my_classes = self.driver.find_element("id", 'my_classes')
         
         
@@ -99,7 +99,7 @@ class Crawler():
         self.driver.find_element("id", 'resources_link').click()
 
         # wait for the page to load
-        time.sleep(1)
+        sleep(1)
         # find the resources element and save all the sessions in a dictionary
         resources_element = self.driver.find_element(By.ID, "resources")
         i = 0
